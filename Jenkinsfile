@@ -1,5 +1,7 @@
 pipeline {
-    agent any
+    agent {
+        label 'linux'
+    }
 
     tools {
         // Install the Maven version configured as "M3" and add it to the path.
@@ -10,7 +12,7 @@ pipeline {
         stage('pull') {
             steps {
                 // Get some code from a GitHub repository
-                git credentialsId: 'git', url: 'git@github.com:Achhay/jenkins_test.git'
+                git credentialsId: 'git', url: '{your repo}'
                 }
         }
         
@@ -34,5 +36,3 @@ pipeline {
         }
     }
 }
-
-
