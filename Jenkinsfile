@@ -1,39 +1,55 @@
 pipeline {
+    environment {
+        imagename = "achhay/javaapp-jenkins-training"
+        dockerImage = ''
+        registryCredentials = 'dockerhub'
+    }
     agent any
-
     tools {
-        // Install the Maven version configured as "M3" and add it to the path.
         maven "MVN3"
+        dockerTool "docker"
     }
-
+    
     stages {
-        stage('pull') {
+        stage("pullscm") {
             steps {
-                // Get some code from a GitHub repository
                 git credentialsId: 'git', url: 'git@github.com:Achhay/jenkins_test.git'
+            }
+        }
+        stage("build") {
+            steps {
+                sh "mvn -f kubernetes-java clean install"
+            }
+        }
+        stage("Build Docker Image") {
+            steps {
+                script {
+                    dockerImage = docker.build("$imagename","kubernetes-java")
                 }
-        }
-        
-        stage('build') {
-            steps {
-                sh "mvn -Dmaven.test.failure.ignore=true -f api-gateway/ clean package"
             }
         }
-
-        stage('publish') {
+        stage("push Docker image") {
             steps {
-                junit stdioRetention: '', testResults: 'api-gateway/target/surefire-reports/*.xml'
-                archiveArtifacts artifacts: 'api-gateway/target/*.jar', followSymlinks: false
+                script {
+                    docker.withRegistry( '', registryCredentials ) {
+                        dockerImage.push("$BUILD_NUMBER")
+                        dockerImage.push('latest')
+                    }
+                }
             }
         }
-
-        stage('print') {
-            agent {
-                label 'linux'
-            }
+        stage(Removeunusedimages) {
             steps {
-                sh "echo testing"
+                sh "docker rmi $imagename:$BUILD_NUMBER"
+                sh "docker rmi $imagename"
+            }
+        }
+        stage("kubedeployment") {
+            steps {
+                sh "sed -i s/latest/$BUILD_NUMBER/g kubernetes-java/deploy.yml"
+                sh "kubectl apply -f kubernetes-java/deploy.yml"
             }
         }
     }
+
 }
